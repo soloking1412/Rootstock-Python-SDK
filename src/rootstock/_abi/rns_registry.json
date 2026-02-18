@@ -1,0 +1,81 @@
+[
+  {
+    "constant": true,
+    "inputs": [{"name": "node", "type": "bytes32"}],
+    "name": "resolver",
+    "outputs": [{"name": "", "type": "address"}],
+    "type": "function",
+    "stateMutability": "view"
+  },
+  {
+    "constant": true,
+    "inputs": [{"name": "node", "type": "bytes32"}],
+    "name": "owner",
+    "outputs": [{"name": "", "type": "address"}],
+    "type": "function",
+    "stateMutability": "view"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {"name": "node", "type": "bytes32"},
+      {"name": "resolverAddr", "type": "address"}
+    ],
+    "name": "setResolver",
+    "outputs": [],
+    "type": "function",
+    "stateMutability": "nonpayable"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {"name": "node", "type": "bytes32"},
+      {"name": "ownerAddr", "type": "address"}
+    ],
+    "name": "setOwner",
+    "outputs": [],
+    "type": "function",
+    "stateMutability": "nonpayable"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {"name": "node", "type": "bytes32"},
+      {"name": "label", "type": "bytes32"},
+      {"name": "ownerAddr", "type": "address"}
+    ],
+    "name": "setSubnodeOwner",
+    "outputs": [],
+    "type": "function",
+    "stateMutability": "nonpayable"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {"name": "node", "type": "bytes32"},
+      {"name": "ownerAddr", "type": "address"},
+      {"name": "resolverAddr", "type": "address"},
+      {"name": "ttl", "type": "uint64"}
+    ],
+    "name": "setRecord",
+    "outputs": [],
+    "type": "function",
+    "stateMutability": "nonpayable"
+  },
+  {
+    "constant": true,
+    "inputs": [{"name": "node", "type": "bytes32"}],
+    "name": "ttl",
+    "outputs": [{"name": "", "type": "uint64"}],
+    "type": "function",
+    "stateMutability": "view"
+  },
+  {
+    "constant": true,
+    "inputs": [{"name": "node", "type": "bytes32"}],
+    "name": "recordExists",
+    "outputs": [{"name": "", "type": "bool"}],
+    "type": "function",
+    "stateMutability": "view"
+  }
+]
