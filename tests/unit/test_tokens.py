@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from rootstock.constants import ChainId
-from rootstock.exceptions import TokenError
+from rootstock.exceptions import AllowanceExceededError, TokenError
 from rootstock.tokens import ERC20Token
 
 RIF_MAINNET = "0x2acc95758f8b5f583470ba265eb685a8f45fc9d5"
@@ -120,3 +120,87 @@ class TestERC20ReadMethods:
         token = ERC20Token(mock_provider, RIF_MAINNET)
         result = token.balance_of_human("0x0000000000000000000000000000000000000001")
         assert result == "1.5"
+
+
+class TestNegativeAmountValidation:
+    def test_transfer_negative_amount_raises(self, mock_provider):
+        token = ERC20Token(mock_provider, RIF_MAINNET)
+        wallet = MagicMock()
+        wallet.address = "0x0000000000000000000000000000000000000001"
+        with pytest.raises(ValueError, match="non-negative"):
+            token.transfer(wallet, "0x0000000000000000000000000000000000000002", -1)
+
+    def test_approve_negative_amount_raises(self, mock_provider):
+        token = ERC20Token(mock_provider, RIF_MAINNET)
+        wallet = MagicMock()
+        wallet.address = "0x0000000000000000000000000000000000000001"
+        with pytest.raises(ValueError, match="non-negative"):
+            token.approve(wallet, "0x0000000000000000000000000000000000000002", -100)
+
+    def test_transfer_from_negative_amount_raises(self, mock_provider):
+        token = ERC20Token(mock_provider, RIF_MAINNET)
+        wallet = MagicMock()
+        wallet.address = "0x0000000000000000000000000000000000000001"
+        with pytest.raises(ValueError, match="non-negative"):
+            token.transfer_from(
+                wallet,
+                "0x0000000000000000000000000000000000000002",
+                "0x0000000000000000000000000000000000000003",
+                -50,
+            )
+
+    def test_transfer_zero_amount_ok(self, mock_provider):
+        token = ERC20Token(mock_provider, RIF_MAINNET)
+        wallet = MagicMock()
+        wallet.address = "0x0000000000000000000000000000000000000001"
+        mock_contract = mock_provider.w3.eth.contract.return_value
+        mock_contract.functions.transfer.return_value.build_transaction.return_value = {
+            "data": "0x"
+        }
+        try:
+            token.transfer(wallet, "0x0000000000000000000000000000000000000002", 0)
+        except ValueError:
+            pytest.fail("Zero amount should not raise ValueError")
+        except Exception:
+            pass
+
+
+class TestAllowanceCheck:
+    def test_transfer_from_insufficient_allowance_raises(self, mock_provider):
+        mock_contract = mock_provider.w3.eth.contract.return_value
+        mock_contract.functions.allowance.return_value.call.return_value = 50
+
+        token = ERC20Token(mock_provider, RIF_MAINNET)
+        wallet = MagicMock()
+        wallet.address = "0x0000000000000000000000000000000000000001"
+
+        with pytest.raises(AllowanceExceededError, match="Allowance 50 < transfer amount 100"):
+            token.transfer_from(
+                wallet,
+                "0x0000000000000000000000000000000000000002",
+                "0x0000000000000000000000000000000000000003",
+                100,
+            )
+
+    def test_transfer_from_exact_allowance_ok(self, mock_provider):
+        mock_contract = mock_provider.w3.eth.contract.return_value
+        mock_contract.functions.allowance.return_value.call.return_value = 100
+        mock_contract.functions.transferFrom.return_value.build_transaction.return_value = {
+            "data": "0x"
+        }
+
+        token = ERC20Token(mock_provider, RIF_MAINNET)
+        wallet = MagicMock()
+        wallet.address = "0x0000000000000000000000000000000000000001"
+
+        try:
+            token.transfer_from(
+                wallet,
+                "0x0000000000000000000000000000000000000002",
+                "0x0000000000000000000000000000000000000003",
+                100,
+            )
+        except AllowanceExceededError:
+            pytest.fail("Exact allowance should not raise AllowanceExceededError")
+        except Exception:
+            pass

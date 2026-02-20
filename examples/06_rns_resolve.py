@@ -1,6 +1,6 @@
 """Example: RNS domain resolution."""
 
-from rootstock import RootstockProvider, RNS
+from rootstock import RNS, RootstockProvider
 
 # Connect to mainnet (RNS is primarily on mainnet)
 provider = RootstockProvider.from_mainnet()
@@ -22,5 +22,4 @@ rns = RNS(provider)
 # owner = rns.get_owner("alice.rsk")
 # print(f"Owner: {owner}")
 
-print("RNS resolution example (uncomment to resolve real domains)")
-print("Note: Requires actual RNS domains to exist on mainnet")
+print("RNS resolution example — uncomment with real domains to test")

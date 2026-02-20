@@ -6,7 +6,7 @@ from rootstock.constants import ChainId
 from rootstock.exceptions import InvalidPrivateKeyError, KeystoreDecryptionError
 from rootstock.wallet import Wallet, WalletInfo
 
-# Well-known test private key (Hardhat account #0 - NEVER use for real funds)
+# Hardhat account #0
 TEST_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 TEST_ADDR_LOWER = "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
 
@@ -131,9 +131,11 @@ class TestWalletSigning:
         wallet = Wallet.from_private_key(TEST_KEY, chain_id=ChainId.TESTNET)
         sig = wallet.sign_message("Hello Rootstock!")
         assert isinstance(sig, str)
-        assert len(sig) > 0
+        assert sig.startswith("0x")
+        assert len(sig) > 2
 
     def test_sign_message_bytes(self):
         wallet = Wallet.from_private_key(TEST_KEY)
         sig = wallet.sign_message(b"Hello bytes!")
         assert isinstance(sig, str)
+        assert sig.startswith("0x")

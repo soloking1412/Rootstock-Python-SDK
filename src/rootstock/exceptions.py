@@ -11,7 +11,7 @@ class ProviderError(RootstockError):
     pass
 
 
-class ConnectionError(ProviderError):
+class ProviderConnectionError(ProviderError):
     pass
 
 
@@ -101,5 +101,3 @@ class InvalidAddressError(AddressError):
     pass
 
 
-class ChecksumMismatchError(AddressError):
-    pass

@@ -57,4 +57,4 @@ class TestMainnetProviderIntegration:
 
     def test_get_block_number(self, mainnet_provider):
         block = mainnet_provider.get_block_number()
-        assert block > 4_000_000  # Mainnet has millions of blocks
+        assert block > 4_000_000

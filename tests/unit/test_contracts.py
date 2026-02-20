@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from rootstock.contracts import Contract
-from rootstock.exceptions import ABIError
+from rootstock.exceptions import ABIError, ContractNotFoundError
 
 SAMPLE_ABI = [
     {
@@ -43,6 +43,7 @@ def mock_provider():
     provider = MagicMock()
     provider.chain_id = 31
     provider.w3 = MagicMock()
+    provider.get_code.return_value = b"\x60\x80"
 
     mock_contract = MagicMock()
     provider.w3.eth.contract.return_value = mock_contract
@@ -112,3 +113,20 @@ class TestContractCall:
         contract = Contract(mock_provider, CONTRACT_ADDR, SAMPLE_ABI)
         with pytest.raises(ABIError, match="not found"):
             contract.call("nonexistent")
+
+
+class TestContractNotFound:
+    def test_no_code_at_address_raises(self, mock_provider):
+        mock_provider.get_code.return_value = b""
+        with pytest.raises(ContractNotFoundError, match="No contract code"):
+            Contract(mock_provider, CONTRACT_ADDR, SAMPLE_ABI)
+
+    def test_none_code_at_address_raises(self, mock_provider):
+        mock_provider.get_code.return_value = b""
+        with pytest.raises(ContractNotFoundError):
+            Contract(mock_provider, CONTRACT_ADDR, SAMPLE_ABI)
+
+    def test_valid_code_passes(self, mock_provider):
+        mock_provider.get_code.return_value = b"\x60\x80\x60\x40"
+        contract = Contract(mock_provider, CONTRACT_ADDR, SAMPLE_ABI)
+        assert contract.address.lower() == CONTRACT_ADDR.lower()

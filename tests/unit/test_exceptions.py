@@ -2,8 +2,6 @@ from rootstock.exceptions import (
     ABIError,
     AddressError,
     AllowanceExceededError,
-    ChecksumMismatchError,
-    ConnectionError,
     ContractError,
     ContractNotFoundError,
     DomainNotFoundError,
@@ -14,6 +12,7 @@ from rootstock.exceptions import (
     InvalidPrivateKeyError,
     KeystoreDecryptionError,
     NonceTooLowError,
+    ProviderConnectionError,
     ProviderError,
     ResolverNotFoundError,
     RNSError,
@@ -29,7 +28,7 @@ from rootstock.exceptions import (
 class TestExceptionHierarchy:
     def test_all_inherit_from_rootstock_error(self):
         exceptions = [
-            ProviderError, ConnectionError, RPCError,
+            ProviderError, ProviderConnectionError, RPCError,
             WalletError, InvalidPrivateKeyError, KeystoreDecryptionError,
             InsufficientFundsError,
             TransactionError, TransactionRevertedError, GasEstimationError,
@@ -37,13 +36,13 @@ class TestExceptionHierarchy:
             ContractError, ContractNotFoundError, ABIError,
             TokenError, AllowanceExceededError,
             RNSError, DomainNotFoundError, ResolverNotFoundError, InvalidDomainError,
-            AddressError, InvalidAddressError, ChecksumMismatchError,
+            AddressError, InvalidAddressError,
         ]
         for exc_cls in exceptions:
             assert issubclass(exc_cls, RootstockError), f"{exc_cls.__name__} not subclass"
 
     def test_provider_hierarchy(self):
-        assert issubclass(ConnectionError, ProviderError)
+        assert issubclass(ProviderConnectionError, ProviderError)
         assert issubclass(RPCError, ProviderError)
 
     def test_wallet_hierarchy(self):
@@ -69,7 +68,6 @@ class TestExceptionHierarchy:
 
     def test_address_hierarchy(self):
         assert issubclass(InvalidAddressError, AddressError)
-        assert issubclass(ChecksumMismatchError, AddressError)
 
 
 class TestRPCError:

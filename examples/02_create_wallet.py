@@ -1,11 +1,11 @@
 """Example: Create and manage wallets."""
 
-from rootstock import Wallet, ChainId
+from rootstock import ChainId, Wallet
 
 # Create a new wallet
 wallet = Wallet.create(chain_id=ChainId.TESTNET)
 print(f"Address: {wallet.address}")
-print(f"Private Key: {wallet.private_key}")
+print(f"Private Key: {wallet.private_key[:6]}...{wallet.private_key[-4:]}")
 print(f"Chain ID: {wallet.chain_id}")
 
 # Encrypt to keystore
@@ -23,7 +23,7 @@ print(f"Imported address: {imported.address}")
 
 # Sign a message
 signature = wallet.sign_message("Hello Rootstock!")
-print(f"\nSignature: 0x{signature[:20]}...")
+print(f"\nSignature: {signature[:22]}...")
 
 # Safe wallet info (no private key)
 info = wallet.info

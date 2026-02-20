@@ -30,11 +30,6 @@ RNS_REGISTRY: dict[ChainId, str] = {
     ChainId.TESTNET: "0x7d284aaac6e925aad802a53c0c69efe3764597b8",
 }
 
-RNS_RESOLVER: dict[ChainId, str] = {
-    ChainId.MAINNET: "0x4efd25e3d348f8f25a14fb7655fba6f72edfe93a",
-    ChainId.TESTNET: "",
-}
-
 TOKENS: dict[str, dict[ChainId, str]] = {
     "WRBTC": {
         ChainId.MAINNET: "0x542FDA317318eBf1d3DeAF76E0B632741a7e677d",
@@ -48,8 +43,6 @@ TOKENS: dict[str, dict[ChainId, str]] = {
 }
 
 DEFAULT_GAS_LIMIT_TRANSFER = 21_000
-DEFAULT_GAS_LIMIT_ERC20 = 60_000
-DEFAULT_GAS_LIMIT_CONTRACT = 100_000
 
 ADDR_REVERSE_SUFFIX = ".addr.reverse"
 

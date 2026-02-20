@@ -35,6 +35,12 @@ def to_checksum_address(address: str, chain_id: int | None = None) -> str:
     return "0x" + "".join(result)
 
 
+def normalize_address_for_web3(address: str) -> str:
+    from web3 import Web3
+
+    return Web3.to_checksum_address(address.lower())
+
+
 def is_checksum_address(address: str, chain_id: int | None = None) -> bool:
     try:
         return address == to_checksum_address(address, chain_id)

@@ -1,6 +1,6 @@
 """Example: Send RBTC on testnet."""
 
-from rootstock import RootstockProvider, Wallet, TransactionBuilder, ChainId, to_wei, from_wei
+from rootstock import ChainId, RootstockProvider, TransactionBuilder, Wallet, from_wei, to_wei
 
 # Connect to testnet
 provider = RootstockProvider.from_testnet()
@@ -13,10 +13,9 @@ print(f"Sender: {wallet.address}")
 balance = provider.get_balance(wallet.address)
 print(f"Balance: {from_wei(balance, 'rbtc')} RBTC")
 
-# Create transaction builder
 tx = TransactionBuilder(provider, wallet)
 
-# Estimate cost first
+# Estimate cost
 recipient = "0x0000000000000000000000000000000000000001"
 cost = tx.estimate_total_cost(to=recipient, value=to_wei(0.001, "rbtc"))
 print(f"Estimated gas: {cost['gas']}")

@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import json
+import logging
 from importlib.resources import files as pkg_files
 
-from web3 import Web3
-
+from rootstock._utils.checksum import normalize_address_for_web3
 from rootstock._utils.checksum import to_checksum_address as rsk_checksum
 from rootstock._utils.namehash import namehash
 from rootstock.constants import ADDR_REVERSE_SUFFIX, RNS_REGISTRY, ZERO_ADDRESS, ChainId
@@ -17,6 +17,8 @@ from rootstock.exceptions import (
     RPCError,
 )
 from rootstock.provider import RootstockProvider
+
+logger = logging.getLogger(__name__)
 
 
 def _load_abi(name: str) -> list[dict]:
@@ -44,7 +46,7 @@ class RNS:
                 "Provide registry_address explicitly."
             )
 
-        self._registry_address = Web3.to_checksum_address(reg_addr.lower())
+        self._registry_address = normalize_address_for_web3(reg_addr)
         registry_abi = _load_abi("rns_registry")
         self._registry = provider.w3.eth.contract(
             address=self._registry_address, abi=registry_abi
@@ -136,5 +138,5 @@ class RNS:
         return str(resolver_addr)
 
     def _get_resolver_contract(self, resolver_address: str):
-        addr = Web3.to_checksum_address(resolver_address.lower())
+        addr = normalize_address_for_web3(resolver_address)
         return self._provider.w3.eth.contract(address=addr, abi=self._resolver_abi)

@@ -1,6 +1,6 @@
 """Example: ERC-20 token operations."""
 
-from rootstock import RootstockProvider, ERC20Token, Wallet, ChainId
+from rootstock import ERC20Token, RootstockProvider
 
 # Connect to mainnet
 provider = RootstockProvider.from_mainnet()

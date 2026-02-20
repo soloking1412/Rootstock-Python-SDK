@@ -1,6 +1,6 @@
 """Example: Generic smart contract interaction."""
 
-from rootstock import RootstockProvider, Contract, Wallet, ChainId
+from rootstock import RootstockProvider
 
 # Connect to testnet
 provider = RootstockProvider.from_testnet()

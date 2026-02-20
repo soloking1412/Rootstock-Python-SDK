@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 
 from eth_account import Account
@@ -12,6 +13,8 @@ from rootstock._utils.checksum import to_checksum_address as rsk_checksum
 from rootstock.constants import ChainId
 from rootstock.exceptions import InvalidPrivateKeyError, KeystoreDecryptionError
 from rootstock.types import KeystoreDict, PrivateKey
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -32,6 +35,7 @@ class Wallet:
     def create(cls, chain_id: int = ChainId.MAINNET) -> Wallet:
         """Generate a new random wallet."""
         account = Account.create()
+        logger.info("Created new wallet")
         return cls(account, chain_id)
 
     @classmethod
@@ -62,8 +66,6 @@ class Wallet:
                 keystore = json.loads(keystore)
             key = Account.decrypt(keystore, password)
             account = Account.from_key(key)
-        except (json.JSONDecodeError, ValueError, TypeError) as exc:
-            raise KeystoreDecryptionError(f"Failed to decrypt keystore: {exc}") from exc
         except Exception as exc:
             raise KeystoreDecryptionError(f"Failed to decrypt keystore: {exc}") from exc
         return cls(account, chain_id)
@@ -99,7 +101,7 @@ class Wallet:
         else:
             msg = encode_defunct(primitive=message)
         signed = self._account.sign_message(msg)
-        return signed.signature.hex()
+        return "0x" + signed.signature.hex()
 
     def encrypt(self, password: str, kdf: str = "scrypt") -> KeystoreDict:
         return Account.encrypt(self._account.key, password, kdf=kdf)

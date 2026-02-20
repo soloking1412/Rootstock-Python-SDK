@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
-from web3 import Web3
 from web3.contract import Contract as Web3Contract
 from web3.exceptions import ContractLogicError
 
-from rootstock.exceptions import ABIError, ContractError, RPCError
+from rootstock._utils.checksum import normalize_address_for_web3
+from rootstock.exceptions import ABIError, ContractError, ContractNotFoundError, RPCError
 from rootstock.provider import RootstockProvider
 from rootstock.transactions import TransactionBuilder
 from rootstock.wallet import Wallet
+
+logger = logging.getLogger(__name__)
 
 
 class Contract:
@@ -22,7 +25,12 @@ class Contract:
             raise ABIError("ABI cannot be empty")
 
         self._provider = provider
-        self._address = Web3.to_checksum_address(address.lower())
+        self._address = normalize_address_for_web3(address)
+
+        code = provider.get_code(self._address)
+        if not code:
+            raise ContractNotFoundError(f"No contract code at address {address}")
+
         self._abi = abi
         self._contract: Web3Contract = provider.w3.eth.contract(
             address=self._address, abi=abi
@@ -67,7 +75,7 @@ class Contract:
         tx_builder = TransactionBuilder(self._provider, wallet)
 
         data = fn(*args, **kwargs).build_transaction(
-            {"from": Web3.to_checksum_address(wallet.address.lower()), "gas": 0}
+            {"from": normalize_address_for_web3(wallet.address), "gas": 0}
         )["data"]
 
         tx_dict = tx_builder.build_transaction(

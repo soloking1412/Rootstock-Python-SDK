@@ -3,16 +3,18 @@
 from __future__ import annotations
 
 import json
+import logging
 from decimal import Decimal
 from importlib.resources import files as pkg_files
 
-from web3 import Web3
-
+from rootstock._utils.checksum import normalize_address_for_web3
 from rootstock.constants import TOKENS, ChainId
-from rootstock.exceptions import RPCError, TokenError
+from rootstock.exceptions import AllowanceExceededError, RPCError, TokenError
 from rootstock.provider import RootstockProvider
 from rootstock.transactions import TransactionBuilder
 from rootstock.wallet import Wallet
+
+logger = logging.getLogger(__name__)
 
 
 def _load_erc20_abi() -> list[dict]:
@@ -29,7 +31,7 @@ class ERC20Token:
         abi: list | None = None,
     ):
         self._provider = provider
-        self._address = Web3.to_checksum_address(token_address.lower())
+        self._address = normalize_address_for_web3(token_address)
         self._abi = abi or _load_erc20_abi()
         self._contract = provider.w3.eth.contract(address=self._address, abi=self._abi)
 
@@ -72,15 +74,15 @@ class ERC20Token:
 
     def balance_of(self, address: str) -> int:
         try:
-            addr = Web3.to_checksum_address(address.lower())
+            addr = normalize_address_for_web3(address)
             return self._contract.functions.balanceOf(addr).call()
         except Exception as exc:
             raise RPCError(f"Failed to get balance: {exc}") from exc
 
     def allowance(self, owner: str, spender: str) -> int:
         try:
-            owner_addr = Web3.to_checksum_address(owner.lower())
-            spender_addr = Web3.to_checksum_address(spender.lower())
+            owner_addr = normalize_address_for_web3(owner)
+            spender_addr = normalize_address_for_web3(spender)
             return self._contract.functions.allowance(owner_addr, spender_addr).call()
         except Exception as exc:
             raise RPCError(f"Failed to get allowance: {exc}") from exc
@@ -101,8 +103,10 @@ class ERC20Token:
         wait: bool = True,
         timeout: int = 120,
     ) -> dict | str:
-        to_addr = Web3.to_checksum_address(to.lower())
-        from_addr = Web3.to_checksum_address(wallet.address.lower())
+        if amount < 0:
+            raise ValueError("amount must be non-negative")
+        to_addr = normalize_address_for_web3(to)
+        from_addr = normalize_address_for_web3(wallet.address)
 
         data = self._contract.functions.transfer(to_addr, amount).build_transaction(
             {"from": from_addr, "gas": 0}
@@ -127,8 +131,10 @@ class ERC20Token:
         wait: bool = True,
         timeout: int = 120,
     ) -> dict | str:
-        spender_addr = Web3.to_checksum_address(spender.lower())
-        from_addr = Web3.to_checksum_address(wallet.address.lower())
+        if amount < 0:
+            raise ValueError("amount must be non-negative")
+        spender_addr = normalize_address_for_web3(spender)
+        from_addr = normalize_address_for_web3(wallet.address)
 
         data = self._contract.functions.approve(spender_addr, amount).build_transaction(
             {"from": from_addr, "gas": 0}
@@ -154,9 +160,16 @@ class ERC20Token:
         wait: bool = True,
         timeout: int = 120,
     ) -> dict | str:
-        from_addr = Web3.to_checksum_address(from_address.lower())
-        to_addr = Web3.to_checksum_address(to.lower())
-        sender_addr = Web3.to_checksum_address(wallet.address.lower())
+        if amount < 0:
+            raise ValueError("amount must be non-negative")
+        current_allowance = self.allowance(from_address, wallet.address)
+        if current_allowance < amount:
+            raise AllowanceExceededError(
+                f"Allowance {current_allowance} < transfer amount {amount}"
+            )
+        from_addr = normalize_address_for_web3(from_address)
+        to_addr = normalize_address_for_web3(to)
+        sender_addr = normalize_address_for_web3(wallet.address)
 
         data = self._contract.functions.transferFrom(
             from_addr, to_addr, amount

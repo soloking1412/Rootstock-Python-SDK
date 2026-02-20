@@ -1,8 +1,10 @@
+import threading
 from unittest.mock import MagicMock
 
 import pytest
 
 from rootstock.constants import ChainId
+from rootstock.exceptions import InsufficientFundsError
 from rootstock.transactions import TransactionBuilder
 from rootstock.wallet import Wallet
 
@@ -17,6 +19,7 @@ def mock_provider():
     provider.get_transaction_count.return_value = 5
     provider.get_gas_price.return_value = 60_000_000
     provider.estimate_gas.return_value = 21_000
+    provider.get_balance.return_value = 10**18
     provider.send_raw_transaction.return_value = "0x" + "ab" * 32
     provider.wait_for_transaction.return_value = {
         "status": 1,
@@ -110,6 +113,12 @@ class TestSignAndSend:
         result = builder.sign_and_send(tx, wait=False)
         assert isinstance(result, str)
 
+    def test_insufficient_funds_raises(self, builder, mock_provider):
+        mock_provider.get_balance.return_value = 100
+        tx = builder.build_transaction(to=TEST_TO, value=10**18, gas_limit=21000)
+        with pytest.raises(InsufficientFundsError):
+            builder.sign_and_send(tx)
+
 
 class TestEstimateTotalCost:
     def test_estimate(self, builder, mock_provider):
@@ -123,3 +132,48 @@ class TestEstimateTotalCost:
         assert cost["gas_price"] == 60_000_000
         assert cost["gas_cost"] == 21_000 * 60_000_000
         assert cost["total_cost"] == 10**18 + 21_000 * 60_000_000
+
+    def test_estimate_with_str_data(self, builder, mock_provider):
+        cost = builder.estimate_total_cost(to=TEST_TO, value=0, data="0xabcd")
+        assert "gas" in cost
+
+    def test_estimate_with_bytes_data(self, builder, mock_provider):
+        cost = builder.estimate_total_cost(to=TEST_TO, value=0, data=b"\xab\xcd")
+        assert "gas" in cost
+
+
+class TestNonceTracking:
+    def test_nonce_offset_increments(self, mock_provider, wallet):
+        builder = TransactionBuilder(mock_provider, wallet)
+        mock_provider.get_transaction_count.return_value = 5
+        n1 = builder._auto_nonce()
+        assert n1 == 5
+        n2 = builder._auto_nonce()
+        assert n2 == 6
+        n3 = builder._auto_nonce()
+        assert n3 == 7
+
+    def test_nonce_resets_when_base_changes(self, mock_provider, wallet):
+        builder = TransactionBuilder(mock_provider, wallet)
+        mock_provider.get_transaction_count.return_value = 5
+        builder._auto_nonce()
+        builder._auto_nonce()
+        mock_provider.get_transaction_count.return_value = 7
+        n = builder._auto_nonce()
+        assert n == 7
+
+    def test_reset_nonce(self, mock_provider, wallet):
+        builder = TransactionBuilder(mock_provider, wallet)
+        mock_provider.get_transaction_count.return_value = 5
+        builder._auto_nonce()
+        builder._auto_nonce()
+        builder.reset_nonce()
+        mock_provider.get_transaction_count.return_value = 5
+        n = builder._auto_nonce()
+        assert n == 5
+
+
+class TestThreadSafety:
+    def test_lock_exists(self, builder):
+        assert hasattr(builder, "_lock")
+        assert isinstance(builder._lock, type(threading.Lock()))

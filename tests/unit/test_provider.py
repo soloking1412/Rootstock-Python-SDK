@@ -5,6 +5,8 @@ import pytest
 from rootstock.constants import ChainId
 from rootstock.exceptions import (
     GasEstimationError,
+    NonceTooLowError,
+    ProviderConnectionError,
     RPCError,
     TransactionRevertedError,
 )
@@ -25,7 +27,7 @@ def mock_web3():
         mock_w3.middleware_onion = MagicMock()
         mock_web3_cls.return_value = mock_w3
         mock_web3_cls.HTTPProvider = MagicMock()
-        mock_web3_cls.to_checksum_address = lambda addr: addr  # passthrough
+        mock_web3_cls.to_checksum_address = lambda addr: addr
         yield mock_w3
 
 
@@ -48,6 +50,11 @@ class TestProviderConstruction:
         provider = RootstockProvider.from_mainnet(rpc_url="https://custom.rpc.co")
         assert provider.network.rpc_url == "https://custom.rpc.co"
 
+    def test_from_websocket(self, mock_web3):
+        with patch("rootstock.provider.WebSocketProvider", create=True):
+            provider = RootstockProvider.from_websocket("wss://node.example.com", chain_id=30)
+            assert provider.chain_id == 30
+
     def test_is_connected(self, mock_web3):
         provider = RootstockProvider.from_testnet()
         assert provider.is_connected is True
@@ -64,6 +71,10 @@ class TestProviderConstruction:
     def test_network_property(self, mock_web3):
         provider = RootstockProvider.from_testnet()
         assert isinstance(provider.network, NetworkConfig)
+
+    def test_max_retries_param(self, mock_web3):
+        provider = RootstockProvider.from_testnet(max_retries=5)
+        assert provider._max_retries == 5
 
 
 class TestProviderReadMethods:
@@ -156,6 +167,30 @@ class TestProviderErrorHandling:
 
     def test_get_balance_rpc_error(self, mock_web3):
         mock_web3.eth.get_balance.side_effect = Exception("connection refused")
-        provider = RootstockProvider.from_testnet()
+        provider = RootstockProvider.from_testnet(max_retries=1)
         with pytest.raises(RPCError):
             provider.get_balance("0x0000000000000000000000000000000000000001")
+
+    def test_connection_error_retry(self, mock_web3):
+        mock_web3.eth.get_balance.side_effect = [
+            OSError("connection reset"),
+            10**18,
+        ]
+        provider = RootstockProvider.from_testnet(max_retries=2)
+        balance = provider.get_balance("0x0000000000000000000000000000000000000001")
+        assert balance == 10**18
+        assert mock_web3.eth.get_balance.call_count == 2
+
+    def test_connection_error_exhausted(self, mock_web3):
+        mock_web3.eth.get_balance.side_effect = OSError("connection reset")
+        provider = RootstockProvider.from_testnet(max_retries=1)
+        with pytest.raises(ProviderConnectionError):
+            provider.get_balance("0x0000000000000000000000000000000000000001")
+
+    def test_nonce_too_low_detection(self, mock_web3):
+        from web3.exceptions import Web3RPCError
+
+        mock_web3.eth.send_raw_transaction.side_effect = Web3RPCError("nonce too low")
+        provider = RootstockProvider.from_testnet()
+        with pytest.raises(NonceTooLowError):
+            provider.send_raw_transaction(b"\x00")

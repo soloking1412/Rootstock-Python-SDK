@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import logging
+import threading
 from decimal import Decimal
 
-from web3 import Web3
-
+from rootstock._utils.checksum import normalize_address_for_web3
 from rootstock._utils.units import from_wei, to_wei
 from rootstock.constants import DEFAULT_GAS_LIMIT_TRANSFER
+from rootstock.exceptions import InsufficientFundsError
 from rootstock.provider import RootstockProvider
 from rootstock.wallet import Wallet
+
+logger = logging.getLogger(__name__)
 
 
 class TransactionBuilder:
@@ -17,6 +21,9 @@ class TransactionBuilder:
     def __init__(self, provider: RootstockProvider, wallet: Wallet):
         self._provider = provider
         self._wallet = wallet
+        self._lock = threading.Lock()
+        self._nonce_offset = 0
+        self._last_base_nonce: int | None = None
 
     def transfer(
         self,
@@ -54,8 +61,8 @@ class TransactionBuilder:
         gas_price: int | None = None,
         nonce: int | None = None,
     ) -> dict:
-        to_addr = Web3.to_checksum_address(to.lower())
-        from_addr = Web3.to_checksum_address(self._wallet.address.lower())
+        to_addr = normalize_address_for_web3(to)
+        from_addr = normalize_address_for_web3(self._wallet.address)
 
         if isinstance(data, str) and data.startswith("0x"):
             data_hex = data
@@ -82,6 +89,7 @@ class TransactionBuilder:
         else:
             tx["gas"] = self._provider.estimate_gas(tx)
 
+        logger.debug("Built transaction: to=%s, value=%d, nonce=%d", tx["to"], tx["value"], tx["nonce"])
         return tx
 
     def sign_and_send(
@@ -90,8 +98,16 @@ class TransactionBuilder:
         wait: bool = True,
         timeout: int = 120,
     ) -> dict | str:
-        signed_tx = self._wallet.sign_transaction(tx_dict)
-        tx_hash = self._provider.send_raw_transaction(signed_tx)
+        with self._lock:
+            balance = self._provider.get_balance(self._wallet.address)
+            total_needed = tx_dict.get("value", 0) + tx_dict["gas"] * tx_dict["gasPrice"]
+            if balance < total_needed:
+                raise InsufficientFundsError(
+                    f"Insufficient funds: balance {balance} wei < required {total_needed} wei"
+                )
+
+            signed_tx = self._wallet.sign_transaction(tx_dict)
+            tx_hash = self._provider.send_raw_transaction(signed_tx)
 
         if wait:
             return self._provider.wait_for_transaction(tx_hash, timeout=timeout)
@@ -101,16 +117,23 @@ class TransactionBuilder:
         self,
         to: str,
         value: int = 0,
-        data: bytes = b"",
+        data: bytes | str = b"",
     ) -> dict:
-        to_addr = Web3.to_checksum_address(to.lower())
-        from_addr = Web3.to_checksum_address(self._wallet.address.lower())
+        to_addr = normalize_address_for_web3(to)
+        from_addr = normalize_address_for_web3(self._wallet.address)
+
+        if isinstance(data, str) and data.startswith("0x"):
+            data_hex = data
+        elif isinstance(data, bytes):
+            data_hex = "0x" + data.hex() if data else "0x"
+        else:
+            data_hex = "0x"
 
         tx_params = {
             "from": from_addr,
             "to": to_addr,
             "value": value,
-            "data": "0x" + data.hex() if data else "0x",
+            "data": data_hex,
         }
 
         gas = self._provider.estimate_gas(tx_params)
@@ -127,8 +150,19 @@ class TransactionBuilder:
             "total_cost_rbtc": str(from_wei(total_cost, "rbtc")),
         }
 
+    def reset_nonce(self) -> None:
+        with self._lock:
+            self._nonce_offset = 0
+            self._last_base_nonce = None
+
     def _auto_nonce(self) -> int:
-        return self._provider.get_transaction_count(self._wallet.address)
+        base = self._provider.get_transaction_count(self._wallet.address)
+        if self._last_base_nonce is not None and base == self._last_base_nonce:
+            self._nonce_offset += 1
+        else:
+            self._nonce_offset = 0
+            self._last_base_nonce = base
+        return base + self._nonce_offset
 
     def _auto_gas_price(self) -> int:
         return self._provider.get_gas_price()
