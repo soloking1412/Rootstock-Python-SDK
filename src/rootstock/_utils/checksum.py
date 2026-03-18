@@ -38,6 +38,7 @@ def to_checksum_address(address: str, chain_id: int | None = None) -> str:
 def normalize_address_for_web3(address: str) -> str:
     from web3 import Web3
 
+    normalize_address(address)  # raises InvalidAddressError for invalid input
     return Web3.to_checksum_address(address.lower())
 
 

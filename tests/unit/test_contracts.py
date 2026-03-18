@@ -130,3 +130,9 @@ class TestContractNotFound:
         mock_provider.get_code.return_value = b"\x60\x80\x60\x40"
         contract = Contract(mock_provider, CONTRACT_ADDR, SAMPLE_ABI)
         assert contract.address.lower() == CONTRACT_ADDR.lower()
+
+    def test_verify_false_skips_code_check(self, mock_provider):
+        mock_provider.get_code.return_value = b""
+        contract = Contract(mock_provider, CONTRACT_ADDR, SAMPLE_ABI, verify=False)
+        assert contract.address.lower() == CONTRACT_ADDR.lower()
+        mock_provider.get_code.assert_not_called()

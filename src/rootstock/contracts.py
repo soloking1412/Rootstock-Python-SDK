@@ -20,16 +20,19 @@ logger = logging.getLogger(__name__)
 
 class Contract:
 
-    def __init__(self, provider: RootstockProvider, address: str, abi: list[dict]):
+    def __init__(
+        self, provider: RootstockProvider, address: str, abi: list[dict], *, verify: bool = True
+    ):
         if not abi:
             raise ABIError("ABI cannot be empty")
 
         self._provider = provider
         self._address = normalize_address_for_web3(address)
 
-        code = provider.get_code(self._address)
-        if not code:
-            raise ContractNotFoundError(f"No contract code at address {address}")
+        if verify:
+            code = provider.get_code(self._address)
+            if not code:
+                raise ContractNotFoundError(f"No contract code at address {address}")
 
         self._abi = abi
         self._contract: Web3Contract = provider.w3.eth.contract(

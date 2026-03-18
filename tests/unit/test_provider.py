@@ -50,11 +50,6 @@ class TestProviderConstruction:
         provider = RootstockProvider.from_mainnet(rpc_url="https://custom.rpc.co")
         assert provider.network.rpc_url == "https://custom.rpc.co"
 
-    def test_from_websocket(self, mock_web3):
-        with patch("rootstock.provider.WebSocketProvider", create=True):
-            provider = RootstockProvider.from_websocket("wss://node.example.com", chain_id=30)
-            assert provider.chain_id == 30
-
     def test_is_connected(self, mock_web3):
         provider = RootstockProvider.from_testnet()
         assert provider.is_connected is True
@@ -75,6 +70,10 @@ class TestProviderConstruction:
     def test_max_retries_param(self, mock_web3):
         provider = RootstockProvider.from_testnet(max_retries=5)
         assert provider._max_retries == 5
+
+    def test_max_retries_zero_raises(self, mock_web3):
+        with pytest.raises(ValueError, match="max_retries"):
+            RootstockProvider.from_testnet(max_retries=0)
 
 
 class TestProviderReadMethods:

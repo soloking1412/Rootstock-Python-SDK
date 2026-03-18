@@ -29,6 +29,8 @@ class RootstockProvider:
     and legacy transaction support (no EIP-1559)."""
 
     def __init__(self, network: NetworkConfig, request_timeout: int = 30, max_retries: int = 3):
+        if max_retries < 1:
+            raise ValueError("max_retries must be at least 1")
         self._network = network
         self._max_retries = max_retries
         self._w3 = self._configure_web3(network.rpc_url, request_timeout)
@@ -51,13 +53,6 @@ class RootstockProvider:
         cls, rpc_url: str, chain_id: int, request_timeout: int = 30, max_retries: int = 3
     ) -> RootstockProvider:
         network = NetworkConfig.custom(chain_id=chain_id, rpc_url=rpc_url)
-        return cls(network, request_timeout, max_retries)
-
-    @classmethod
-    def from_websocket(
-        cls, ws_url: str, chain_id: int, request_timeout: int = 30, max_retries: int = 3
-    ) -> RootstockProvider:
-        network = NetworkConfig.custom(chain_id=chain_id, rpc_url=ws_url)
         return cls(network, request_timeout, max_retries)
 
     @property
@@ -113,11 +108,11 @@ class RootstockProvider:
 
     def estimate_gas(self, tx_params: dict) -> int:
         try:
-            return self._w3.eth.estimate_gas(tx_params)
+            return self._call_with_retry(
+                self._w3.eth.estimate_gas, tx_params, reraise=(ContractLogicError,)
+            )
         except ContractLogicError as exc:
             raise GasEstimationError(f"Gas estimation failed: {exc}") from exc
-        except Exception as exc:
-            raise self._wrap_error(exc) from exc
 
     def get_code(self, address: str, block: BlockIdentifier = "latest") -> bytes:
         result = self._call_with_retry(
@@ -127,11 +122,13 @@ class RootstockProvider:
 
     def call(self, tx_params: dict, block: BlockIdentifier = "latest") -> bytes:
         try:
-            return bytes(self._w3.eth.call(tx_params, block))
+            return bytes(
+                self._call_with_retry(
+                    self._w3.eth.call, tx_params, block, reraise=(ContractLogicError,)
+                )
+            )
         except ContractLogicError as exc:
             raise RPCError(f"Call reverted: {exc}") from exc
-        except Exception as exc:
-            raise self._wrap_error(exc) from exc
 
     def send_raw_transaction(self, signed_tx: bytes | str) -> str:
         try:
@@ -162,12 +159,12 @@ class RootstockProvider:
             raise TransactionRevertedError(tx_hash, receipt_dict)
         return receipt_dict
 
-    def _call_with_retry(self, fn, *args):
+    def _call_with_retry(self, fn, *args, reraise: tuple = ()):
         last_exc = None
         for attempt in range(self._max_retries):
             try:
                 return fn(*args)
-            except (OSError, ConnectionResetError) as exc:
+            except OSError as exc:
                 last_exc = exc
                 if attempt < self._max_retries - 1:
                     delay = 2 ** attempt
@@ -177,17 +174,13 @@ class RootstockProvider:
                     )
                     time.sleep(delay)
             except Exception as exc:
+                if reraise and isinstance(exc, reraise):
+                    raise
                 raise self._wrap_error(exc) from exc
         raise self._wrap_error(last_exc) from last_exc
 
     def _configure_web3(self, rpc_url: str, timeout: int) -> Web3:
-        if rpc_url.startswith("ws://") or rpc_url.startswith("wss://"):
-            from web3 import WebSocketProvider
-
-            provider = WebSocketProvider(rpc_url)
-        else:
-            provider = Web3.HTTPProvider(rpc_url, request_kwargs={"timeout": timeout})
-
+        provider = Web3.HTTPProvider(rpc_url, request_kwargs={"timeout": timeout})
         w3 = Web3(provider)
         w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
         return w3

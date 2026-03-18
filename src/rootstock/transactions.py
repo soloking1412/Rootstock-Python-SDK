@@ -97,8 +97,9 @@ class TransactionBuilder:
         tx_dict: dict,
         wait: bool = True,
         timeout: int = 120,
+        check_balance: bool = False,
     ) -> dict | str:
-        with self._lock:
+        if check_balance:
             balance = self._provider.get_balance(self._wallet.address)
             total_needed = tx_dict.get("value", 0) + tx_dict["gas"] * tx_dict["gasPrice"]
             if balance < total_needed:
@@ -106,8 +107,8 @@ class TransactionBuilder:
                     f"Insufficient funds: balance {balance} wei < required {total_needed} wei"
                 )
 
-            signed_tx = self._wallet.sign_transaction(tx_dict)
-            tx_hash = self._provider.send_raw_transaction(signed_tx)
+        signed_tx = self._wallet.sign_transaction(tx_dict)
+        tx_hash = self._provider.send_raw_transaction(signed_tx)
 
         if wait:
             return self._provider.wait_for_transaction(tx_hash, timeout=timeout)
@@ -156,13 +157,14 @@ class TransactionBuilder:
             self._last_base_nonce = None
 
     def _auto_nonce(self) -> int:
-        base = self._provider.get_transaction_count(self._wallet.address)
-        if self._last_base_nonce is not None and base == self._last_base_nonce:
-            self._nonce_offset += 1
-        else:
-            self._nonce_offset = 0
-            self._last_base_nonce = base
-        return base + self._nonce_offset
+        with self._lock:
+            base = self._provider.get_transaction_count(self._wallet.address)
+            if self._last_base_nonce is not None and base == self._last_base_nonce:
+                self._nonce_offset += 1
+            else:
+                self._nonce_offset = 0
+                self._last_base_nonce = base
+            return base + self._nonce_offset
 
     def _auto_gas_price(self) -> int:
         return self._provider.get_gas_price()

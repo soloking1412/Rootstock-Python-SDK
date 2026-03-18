@@ -117,7 +117,13 @@ class TestSignAndSend:
         mock_provider.get_balance.return_value = 100
         tx = builder.build_transaction(to=TEST_TO, value=10**18, gas_limit=21000)
         with pytest.raises(InsufficientFundsError):
-            builder.sign_and_send(tx)
+            builder.sign_and_send(tx, check_balance=True)
+
+    def test_no_balance_check_by_default(self, builder, mock_provider):
+        mock_provider.get_balance.return_value = 0
+        tx = builder.build_transaction(to=TEST_TO, value=10**18, gas_limit=21000)
+        builder.sign_and_send(tx)
+        mock_provider.get_balance.assert_not_called()
 
 
 class TestEstimateTotalCost:
@@ -174,6 +180,20 @@ class TestNonceTracking:
 
 
 class TestThreadSafety:
-    def test_lock_exists(self, builder):
-        assert hasattr(builder, "_lock")
-        assert isinstance(builder._lock, type(threading.Lock()))
+    def test_auto_nonce_is_thread_safe(self, mock_provider, wallet):
+        builder = TransactionBuilder(mock_provider, wallet)
+        mock_provider.get_transaction_count.return_value = 10
+
+        results = []
+
+        def get_nonce():
+            results.append(builder._auto_nonce())
+
+        threads = [threading.Thread(target=get_nonce) for _ in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(results) == 5
+        assert len(set(results)) == 5
