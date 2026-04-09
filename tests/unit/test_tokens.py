@@ -66,23 +66,17 @@ class TestERC20Construction:
 
 class TestERC20ReadMethods:
     def test_name(self, mock_provider):
-        mock_provider.w3.eth.contract.return_value.functions.name.return_value.call.return_value = (
-            "RIF Token"
-        )
+        mock_provider.w3.eth.contract.return_value.functions.name.return_value.call.return_value = "RIF Token"
         token = ERC20Token(mock_provider, RIF_MAINNET)
         assert token.name() == "RIF Token"
 
     def test_symbol(self, mock_provider):
-        mock_provider.w3.eth.contract.return_value.functions.symbol.return_value.call.return_value = (
-            "RIF"
-        )
+        mock_provider.w3.eth.contract.return_value.functions.symbol.return_value.call.return_value = "RIF"
         token = ERC20Token(mock_provider, RIF_MAINNET)
         assert token.symbol() == "RIF"
 
     def test_decimals(self, mock_provider):
-        mock_provider.w3.eth.contract.return_value.functions.decimals.return_value.call.return_value = (
-            18
-        )
+        mock_provider.w3.eth.contract.return_value.functions.decimals.return_value.call.return_value = 18
         token = ERC20Token(mock_provider, RIF_MAINNET)
         assert token.decimals() == 18
 

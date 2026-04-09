@@ -7,9 +7,7 @@ from rootstock.provider import RootstockProvider
 
 @pytest.fixture(scope="session")
 def testnet_provider():
-    rpc_url = os.environ.get(
-        "ROOTSTOCK_TESTNET_RPC", "https://public-node.testnet.rsk.co"
-    )
+    rpc_url = os.environ.get("ROOTSTOCK_TESTNET_RPC", "https://public-node.testnet.rsk.co")
     try:
         provider = RootstockProvider.from_testnet(rpc_url=rpc_url)
         if not provider.is_connected:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
 from decimal import Decimal
@@ -17,13 +18,13 @@ from rootstock.wallet import Wallet
 logger = logging.getLogger(__name__)
 
 
+@functools.lru_cache(maxsize=1)
 def _load_erc20_abi() -> list[dict]:
     abi_dir = pkg_files("rootstock._abi")
     return json.loads((abi_dir / "erc20.json").read_text(encoding="utf-8"))
 
 
 class ERC20Token:
-
     def __init__(
         self,
         provider: RootstockProvider,
@@ -37,42 +38,46 @@ class ERC20Token:
 
     @classmethod
     def from_symbol(cls, provider: RootstockProvider, symbol: str) -> ERC20Token:
+        """Look up a well-known token by ticker symbol."""
         symbol_upper = symbol.upper()
         for token_name, addresses in TOKENS.items():
             if token_name.upper() == symbol_upper:
                 chain_id = ChainId(provider.chain_id)
                 if chain_id in addresses:
                     return cls(provider, addresses[chain_id])
-                raise TokenError(
-                    f"Token {symbol!r} not available on chain ID {provider.chain_id}"
-                )
+                raise TokenError(f"Token {symbol!r} not available on chain ID {provider.chain_id}")
         raise TokenError(f"Unknown token symbol: {symbol!r}")
 
     def name(self) -> str:
+        """Return the token name."""
         try:
             return self._contract.functions.name().call()
         except Exception as exc:
             raise RPCError(f"Failed to get token name: {exc}") from exc
 
     def symbol(self) -> str:
+        """Return the token symbol."""
         try:
             return self._contract.functions.symbol().call()
         except Exception as exc:
             raise RPCError(f"Failed to get token symbol: {exc}") from exc
 
     def decimals(self) -> int:
+        """Return the number of decimals."""
         try:
             return self._contract.functions.decimals().call()
         except Exception as exc:
             raise RPCError(f"Failed to get token decimals: {exc}") from exc
 
     def total_supply(self) -> int:
+        """Return the total token supply in smallest units."""
         try:
             return self._contract.functions.totalSupply().call()
         except Exception as exc:
             raise RPCError(f"Failed to get total supply: {exc}") from exc
 
     def balance_of(self, address: str) -> int:
+        """Return the token balance of an address in smallest units."""
         try:
             addr = normalize_address_for_web3(address)
             return self._contract.functions.balanceOf(addr).call()
@@ -80,6 +85,7 @@ class ERC20Token:
             raise RPCError(f"Failed to get balance: {exc}") from exc
 
     def allowance(self, owner: str, spender: str) -> int:
+        """Return the spending allowance granted by owner to spender."""
         try:
             owner_addr = normalize_address_for_web3(owner)
             spender_addr = normalize_address_for_web3(spender)
@@ -88,6 +94,7 @@ class ERC20Token:
             raise RPCError(f"Failed to get allowance: {exc}") from exc
 
     def balance_of_human(self, address: str) -> str:
+        """Return the token balance as a decimal string in full units."""
         raw = self.balance_of(address)
         dec = self.decimals()
         value = Decimal(str(raw)) / Decimal(10**dec)
@@ -102,7 +109,9 @@ class ERC20Token:
         gas_price: int | None = None,
         wait: bool = True,
         timeout: int = 120,
+        tx_builder: TransactionBuilder | None = None,
     ) -> dict | str:
+        """Send tokens to a recipient address."""
         if amount < 0:
             raise ValueError("amount must be non-negative")
         to_addr = normalize_address_for_web3(to)
@@ -112,14 +121,14 @@ class ERC20Token:
             {"from": from_addr, "gas": 0}
         )["data"]
 
-        tx_builder = TransactionBuilder(self._provider, wallet)
-        tx_dict = tx_builder.build_transaction(
+        builder = tx_builder or TransactionBuilder(self._provider, wallet)
+        tx_dict = builder.build_transaction(
             to=self._address,
             data=data,
             gas_limit=gas_limit,
             gas_price=gas_price,
         )
-        return tx_builder.sign_and_send(tx_dict, wait=wait, timeout=timeout)
+        return builder.sign_and_send(tx_dict, wait=wait, timeout=timeout)
 
     def approve(
         self,
@@ -130,7 +139,9 @@ class ERC20Token:
         gas_price: int | None = None,
         wait: bool = True,
         timeout: int = 120,
+        tx_builder: TransactionBuilder | None = None,
     ) -> dict | str:
+        """Approve spender to spend amount tokens on behalf of wallet."""
         if amount < 0:
             raise ValueError("amount must be non-negative")
         spender_addr = normalize_address_for_web3(spender)
@@ -140,14 +151,14 @@ class ERC20Token:
             {"from": from_addr, "gas": 0}
         )["data"]
 
-        tx_builder = TransactionBuilder(self._provider, wallet)
-        tx_dict = tx_builder.build_transaction(
+        builder = tx_builder or TransactionBuilder(self._provider, wallet)
+        tx_dict = builder.build_transaction(
             to=self._address,
             data=data,
             gas_limit=gas_limit,
             gas_price=gas_price,
         )
-        return tx_builder.sign_and_send(tx_dict, wait=wait, timeout=timeout)
+        return builder.sign_and_send(tx_dict, wait=wait, timeout=timeout)
 
     def transfer_from(
         self,
@@ -159,7 +170,9 @@ class ERC20Token:
         gas_price: int | None = None,
         wait: bool = True,
         timeout: int = 120,
+        tx_builder: TransactionBuilder | None = None,
     ) -> dict | str:
+        """Transfer tokens on behalf of from_address using wallet's allowance."""
         if amount < 0:
             raise ValueError("amount must be non-negative")
         current_allowance = self.allowance(from_address, wallet.address)
@@ -171,18 +184,18 @@ class ERC20Token:
         to_addr = normalize_address_for_web3(to)
         sender_addr = normalize_address_for_web3(wallet.address)
 
-        data = self._contract.functions.transferFrom(
-            from_addr, to_addr, amount
-        ).build_transaction({"from": sender_addr, "gas": 0})["data"]
+        data = self._contract.functions.transferFrom(from_addr, to_addr, amount).build_transaction(
+            {"from": sender_addr, "gas": 0}
+        )["data"]
 
-        tx_builder = TransactionBuilder(self._provider, wallet)
-        tx_dict = tx_builder.build_transaction(
+        builder = tx_builder or TransactionBuilder(self._provider, wallet)
+        tx_dict = builder.build_transaction(
             to=self._address,
             data=data,
             gas_limit=gas_limit,
             gas_price=gas_price,
         )
-        return tx_builder.sign_and_send(tx_dict, wait=wait, timeout=timeout)
+        return builder.sign_and_send(tx_dict, wait=wait, timeout=timeout)
 
     @property
     def address(self) -> str:

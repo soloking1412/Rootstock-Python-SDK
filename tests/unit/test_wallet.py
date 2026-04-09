@@ -55,6 +55,10 @@ class TestWalletFromPrivateKey:
         with pytest.raises(InvalidPrivateKeyError):
             Wallet.from_private_key("")
 
+    def test_zero_key_raises(self):
+        with pytest.raises(InvalidPrivateKeyError, match="zero key"):
+            Wallet.from_private_key("0x" + "00" * 32)
+
 
 class TestWalletKeystore:
     def test_encrypt_decrypt_round_trip(self):

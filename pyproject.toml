@@ -40,9 +40,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/rootstock/rootstock-python-sdk"
-Repository = "https://github.com/rootstock/rootstock-python-sdk"
-Issues = "https://github.com/rootstock/rootstock-python-sdk/issues"
+Homepage = "https://github.com/soloking1412/Rootstock-Python-SDK"
+Repository = "https://github.com/soloking1412/Rootstock-Python-SDK"
+Issues = "https://github.com/soloking1412/Rootstock-Python-SDK/issues"
 
 [tool.hatch.version]
 path = "src/rootstock/_version.py"

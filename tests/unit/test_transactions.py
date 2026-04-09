@@ -5,7 +5,7 @@ import pytest
 
 from rootstock.constants import ChainId
 from rootstock.exceptions import InsufficientFundsError
-from rootstock.transactions import TransactionBuilder
+from rootstock.transactions import TransactionBuilder, _normalize_data
 from rootstock.wallet import Wallet
 
 TEST_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
@@ -146,6 +146,31 @@ class TestEstimateTotalCost:
     def test_estimate_with_bytes_data(self, builder, mock_provider):
         cost = builder.estimate_total_cost(to=TEST_TO, value=0, data=b"\xab\xcd")
         assert "gas" in cost
+
+
+class TestNormalizeData:
+    def test_bytes_empty(self):
+        assert _normalize_data(b"") == "0x"
+
+    def test_bytes_nonempty(self):
+        assert _normalize_data(b"\xab\xcd") == "0xabcd"
+
+    def test_hex_string(self):
+        assert _normalize_data("0xabcd") == "0xabcd"
+
+    def test_empty_string(self):
+        assert _normalize_data("") == "0x"
+
+    def test_bare_0x(self):
+        assert _normalize_data("0x") == "0x"
+
+    def test_non_hex_string_raises(self):
+        with pytest.raises(ValueError, match="hex-prefixed"):
+            _normalize_data("deadbeef")
+
+    def test_invalid_data_in_build_transaction(self, builder):
+        with pytest.raises(ValueError):
+            builder.build_transaction(to=TEST_TO, data="deadbeef", gas_limit=21000)
 
 
 class TestNonceTracking:

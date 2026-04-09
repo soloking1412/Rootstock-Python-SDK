@@ -26,7 +26,6 @@ class WalletInfo:
 
 
 class Wallet:
-
     def __init__(self, account: LocalAccount, chain_id: int = ChainId.MAINNET):
         self._account = account
         self._chain_id = chain_id
@@ -39,9 +38,8 @@ class Wallet:
         return cls(account, chain_id)
 
     @classmethod
-    def from_private_key(
-        cls, private_key: PrivateKey, chain_id: int = ChainId.MAINNET
-    ) -> Wallet:
+    def from_private_key(cls, private_key: PrivateKey, chain_id: int = ChainId.MAINNET) -> Wallet:
+        """Load a wallet from a private key."""
         try:
             if isinstance(private_key, bytes):
                 account = Account.from_key(private_key)
@@ -52,6 +50,8 @@ class Wallet:
                 account = Account.from_key(key_str)
         except Exception as exc:
             raise InvalidPrivateKeyError(f"Invalid private key: {exc}") from exc
+        if account.key == b"\x00" * 32:
+            raise InvalidPrivateKeyError("Private key must not be the zero key")
         return cls(account, chain_id)
 
     @classmethod
@@ -76,6 +76,7 @@ class Wallet:
 
     @property
     def private_key(self) -> str:
+        """Return the private key as a hex string. Keep this value secret."""
         key = self._account.key
         if isinstance(key, bytes):
             return "0x" + key.hex()

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from importlib.resources import files as pkg_files
 
 from rootstock._utils.checksum import normalize_address_for_web3
@@ -20,6 +21,8 @@ from rootstock.provider import RootstockProvider
 
 logger = logging.getLogger(__name__)
 
+_LABEL_RE = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")
+
 
 def _load_abi(name: str) -> list[dict]:
     abi_dir = pkg_files("rootstock._abi")
@@ -27,7 +30,6 @@ def _load_abi(name: str) -> list[dict]:
 
 
 class RNS:
-
     def __init__(
         self,
         provider: RootstockProvider,
@@ -48,12 +50,11 @@ class RNS:
 
         self._registry_address = normalize_address_for_web3(reg_addr)
         registry_abi = _load_abi("rns_registry")
-        self._registry = provider.w3.eth.contract(
-            address=self._registry_address, abi=registry_abi
-        )
+        self._registry = provider.w3.eth.contract(address=self._registry_address, abi=registry_abi)
         self._resolver_abi = _load_abi("rns_resolver")
 
     def resolve(self, domain: str) -> str:
+        """Resolve a .rsk domain to its address."""
         domain = self._ensure_rsk_suffix(domain)
         self._validate_domain(domain)
 
@@ -73,6 +74,7 @@ class RNS:
         return rsk_checksum(addr_str, self._provider.chain_id)
 
     def reverse_resolve(self, address: str) -> str | None:
+        """Reverse resolve an address to its .rsk domain name."""
         bare = address.lower().replace("0x", "")
         reverse_name = bare + ADDR_REVERSE_SUFFIX
         node = namehash(reverse_name)
@@ -93,14 +95,25 @@ class RNS:
 
         if not name:
             return None
+
+        try:
+            forward = self.resolve(name)
+        except Exception:
+            return None
+
+        if forward.lower() != address.lower():
+            return None
+
         return str(name)
 
     def get_resolver(self, domain: str) -> str:
+        """Return the resolver address for a domain."""
         domain = self._ensure_rsk_suffix(domain)
         node = namehash(domain)
         return self._get_resolver_address(node, domain)
 
     def get_owner(self, domain: str) -> str:
+        """Return the owner address of a domain."""
         domain = self._ensure_rsk_suffix(domain)
         node = namehash(domain)
         try:
@@ -110,6 +123,7 @@ class RNS:
             raise RPCError(f"Failed to get owner of {domain}: {exc}") from exc
 
     def is_available(self, domain: str) -> bool:
+        """Return True if the domain has no owner."""
         owner = self.get_owner(domain)
         return owner.lower() == ZERO_ADDRESS
 
@@ -126,6 +140,8 @@ class RNS:
         for label in labels:
             if not label:
                 raise InvalidDomainError(f"Domain contains empty label: {domain!r}")
+            if not _LABEL_RE.match(label):
+                raise InvalidDomainError(f"Domain label {label!r} contains invalid characters")
 
     def _get_resolver_address(self, node: bytes, domain: str) -> str:
         try:

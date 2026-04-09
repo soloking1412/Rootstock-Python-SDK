@@ -16,8 +16,19 @@ from rootstock.wallet import Wallet
 logger = logging.getLogger(__name__)
 
 
-class TransactionBuilder:
+def _normalize_data(data: bytes | str) -> str:
+    if isinstance(data, bytes):
+        return "0x" + data.hex() if data else "0x"
+    if isinstance(data, str):
+        if data == "" or data == "0x":
+            return "0x"
+        if not data.startswith("0x"):
+            raise ValueError(f"data string must be hex-prefixed (0x...), got {data!r}")
+        return data
+    raise TypeError(f"data must be bytes or str, got {type(data).__name__}")
 
+
+class TransactionBuilder:
     def __init__(self, provider: RootstockProvider, wallet: Wallet):
         self._provider = provider
         self._wallet = wallet
@@ -36,6 +47,7 @@ class TransactionBuilder:
         wait: bool = True,
         timeout: int = 120,
     ) -> dict | str:
+        """Transfer RBTC to an address."""
         if value_wei is not None:
             value = value_wei
         elif value_rbtc is not None:
@@ -50,7 +62,7 @@ class TransactionBuilder:
             gas_price=gas_price,
             nonce=nonce,
         )
-        return self.sign_and_send(tx_dict, wait=wait, timeout=timeout)
+        return self.sign_and_send(tx_dict, wait=wait, timeout=timeout, check_balance=True)
 
     def build_transaction(
         self,
@@ -61,15 +73,10 @@ class TransactionBuilder:
         gas_price: int | None = None,
         nonce: int | None = None,
     ) -> dict:
+        """Build a legacy transaction dict."""
         to_addr = normalize_address_for_web3(to)
         from_addr = normalize_address_for_web3(self._wallet.address)
-
-        if isinstance(data, str) and data.startswith("0x"):
-            data_hex = data
-        elif isinstance(data, bytes):
-            data_hex = "0x" + data.hex() if data else "0x"
-        else:
-            data_hex = "0x"
+        data_hex = _normalize_data(data)
 
         actual_nonce = nonce if nonce is not None else self._auto_nonce()
         actual_gas_price = gas_price if gas_price is not None else self._auto_gas_price()
@@ -89,7 +96,9 @@ class TransactionBuilder:
         else:
             tx["gas"] = self._provider.estimate_gas(tx)
 
-        logger.debug("Built transaction: to=%s, value=%d, nonce=%d", tx["to"], tx["value"], tx["nonce"])
+        logger.debug(
+            "Built transaction: to=%s, value=%d, nonce=%d", tx["to"], tx["value"], tx["nonce"]
+        )
         return tx
 
     def sign_and_send(
@@ -99,6 +108,7 @@ class TransactionBuilder:
         timeout: int = 120,
         check_balance: bool = False,
     ) -> dict | str:
+        """Sign and broadcast a transaction dict."""
         if check_balance:
             balance = self._provider.get_balance(self._wallet.address)
             total_needed = tx_dict.get("value", 0) + tx_dict["gas"] * tx_dict["gasPrice"]
@@ -120,15 +130,10 @@ class TransactionBuilder:
         value: int = 0,
         data: bytes | str = b"",
     ) -> dict:
+        """Estimate total cost (gas + value) for a transaction."""
         to_addr = normalize_address_for_web3(to)
         from_addr = normalize_address_for_web3(self._wallet.address)
-
-        if isinstance(data, str) and data.startswith("0x"):
-            data_hex = data
-        elif isinstance(data, bytes):
-            data_hex = "0x" + data.hex() if data else "0x"
-        else:
-            data_hex = "0x"
+        data_hex = _normalize_data(data)
 
         tx_params = {
             "from": from_addr,
@@ -152,11 +157,13 @@ class TransactionBuilder:
         }
 
     def reset_nonce(self) -> None:
+        """Reset the nonce offset."""
         with self._lock:
             self._nonce_offset = 0
             self._last_base_nonce = None
 
     def _auto_nonce(self) -> int:
+        # Local offset tracks rapid sequential builds; resets when the on-chain nonce advances.
         with self._lock:
             base = self._provider.get_transaction_count(self._wallet.address)
             if self._last_base_nonce is not None and base == self._last_base_nonce:

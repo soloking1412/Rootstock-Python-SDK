@@ -27,9 +27,7 @@ class TestProviderIntegration:
         assert "hash" in block
 
     def test_get_balance(self, testnet_provider):
-        balance = testnet_provider.get_balance(
-            "0x0000000000000000000000000000000000000000"
-        )
+        balance = testnet_provider.get_balance("0x0000000000000000000000000000000000000000")
         assert isinstance(balance, int)
         assert balance >= 0
 
@@ -41,9 +39,7 @@ class TestProviderIntegration:
         assert count >= 0
 
     def test_get_code_eoa(self, testnet_provider):
-        code = testnet_provider.get_code(
-            "0x0000000000000000000000000000000000000001"
-        )
+        code = testnet_provider.get_code("0x0000000000000000000000000000000000000001")
         assert isinstance(code, bytes)
 
 

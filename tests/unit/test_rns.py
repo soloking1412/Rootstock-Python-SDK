@@ -25,24 +25,27 @@ def mock_provider():
 
 @pytest.fixture
 def rns(mock_provider):
-    with patch("rootstock.rns._load_abi", return_value=[
-        {
-            "constant": True,
-            "inputs": [{"name": "node", "type": "bytes32"}],
-            "name": "resolver",
-            "outputs": [{"name": "", "type": "address"}],
-            "type": "function",
-            "stateMutability": "view",
-        },
-        {
-            "constant": True,
-            "inputs": [{"name": "node", "type": "bytes32"}],
-            "name": "owner",
-            "outputs": [{"name": "", "type": "address"}],
-            "type": "function",
-            "stateMutability": "view",
-        },
-    ]):
+    with patch(
+        "rootstock.rns._load_abi",
+        return_value=[
+            {
+                "constant": True,
+                "inputs": [{"name": "node", "type": "bytes32"}],
+                "name": "resolver",
+                "outputs": [{"name": "", "type": "address"}],
+                "type": "function",
+                "stateMutability": "view",
+            },
+            {
+                "constant": True,
+                "inputs": [{"name": "node", "type": "bytes32"}],
+                "name": "owner",
+                "outputs": [{"name": "", "type": "address"}],
+                "type": "function",
+                "stateMutability": "view",
+            },
+        ],
+    ):
         return RNS(mock_provider)
 
 
@@ -60,24 +63,27 @@ class TestRNSResolve:
         ]
 
         # Re-create RNS since we changed side_effect above
-        with patch("rootstock.rns._load_abi", return_value=[
-            {
-                "constant": True,
-                "inputs": [{"name": "node", "type": "bytes32"}],
-                "name": "resolver",
-                "outputs": [{"name": "", "type": "address"}],
-                "type": "function",
-                "stateMutability": "view",
-            },
-            {
-                "constant": True,
-                "inputs": [{"name": "node", "type": "bytes32"}],
-                "name": "owner",
-                "outputs": [{"name": "", "type": "address"}],
-                "type": "function",
-                "stateMutability": "view",
-            },
-        ]):
+        with patch(
+            "rootstock.rns._load_abi",
+            return_value=[
+                {
+                    "constant": True,
+                    "inputs": [{"name": "node", "type": "bytes32"}],
+                    "name": "resolver",
+                    "outputs": [{"name": "", "type": "address"}],
+                    "type": "function",
+                    "stateMutability": "view",
+                },
+                {
+                    "constant": True,
+                    "inputs": [{"name": "node", "type": "bytes32"}],
+                    "name": "owner",
+                    "outputs": [{"name": "", "type": "address"}],
+                    "type": "function",
+                    "stateMutability": "view",
+                },
+            ],
+        ):
             mock_provider.w3.eth.contract.side_effect = None
             mock_provider.w3.eth.contract.return_value = registry_contract
             rns_inst = RNS(mock_provider)
@@ -133,6 +139,7 @@ class TestRNSReverseResolve:
 
         resolver_contract = MagicMock()
         resolver_contract.functions.name.return_value.call.return_value = "alice.rsk"
+        resolver_contract.functions.addr.return_value.call.return_value = MOCK_RESOLVED_ADDR
         mock_provider.w3.eth.contract.side_effect = lambda address, abi: resolver_contract
 
         rns._registry = registry_contract
@@ -184,6 +191,36 @@ class TestRNSOwnership:
         assert rns.is_available("taken.rsk") is False
 
 
+class TestRNSReverseResolveForwardVerification:
+    def test_reverse_resolve_forward_mismatch_returns_none(self, rns, mock_provider):
+        registry_contract = mock_provider.w3.eth.contract.return_value
+        registry_contract.functions.resolver.return_value.call.return_value = MOCK_RESOLVER_ADDR
+
+        resolver_contract = MagicMock()
+        resolver_contract.functions.name.return_value.call.return_value = "alice.rsk"
+        resolver_contract.functions.addr.return_value.call.return_value = (
+            "0x0000000000000000000000000000000000000001"  # different address
+        )
+        mock_provider.w3.eth.contract.side_effect = lambda address, abi: resolver_contract
+
+        rns._registry = registry_contract
+        result = rns.reverse_resolve(MOCK_RESOLVED_ADDR)
+        assert result is None
+
+    def test_reverse_resolve_forward_match_returns_name(self, rns, mock_provider):
+        registry_contract = mock_provider.w3.eth.contract.return_value
+        registry_contract.functions.resolver.return_value.call.return_value = MOCK_RESOLVER_ADDR
+
+        resolver_contract = MagicMock()
+        resolver_contract.functions.name.return_value.call.return_value = "alice.rsk"
+        resolver_contract.functions.addr.return_value.call.return_value = MOCK_RESOLVED_ADDR
+        mock_provider.w3.eth.contract.side_effect = lambda address, abi: resolver_contract
+
+        rns._registry = registry_contract
+        result = rns.reverse_resolve(MOCK_RESOLVED_ADDR)
+        assert result == "alice.rsk"
+
+
 class TestRNSHelpers:
     def test_ensure_rsk_suffix(self, rns):
         assert rns._ensure_rsk_suffix("alice") == "alice.rsk"
@@ -197,3 +234,18 @@ class TestRNSHelpers:
 
     def test_validate_domain_valid(self, rns):
         rns._validate_domain("alice.rsk")  # should not raise
+
+    def test_validate_domain_unicode_raises(self, rns):
+        with pytest.raises(InvalidDomainError, match="invalid characters"):
+            rns._validate_domain("aliçe.rsk")
+
+    def test_validate_domain_uppercase_raises(self, rns):
+        with pytest.raises(InvalidDomainError, match="invalid characters"):
+            rns._validate_domain("Alice.rsk")
+
+    def test_validate_domain_hyphen_allowed(self, rns):
+        rns._validate_domain("my-name.rsk")  # should not raise
+
+    def test_validate_domain_underscore_raises(self, rns):
+        with pytest.raises(InvalidDomainError, match="invalid characters"):
+            rns._validate_domain("my_name.rsk")

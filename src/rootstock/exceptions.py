@@ -34,10 +34,6 @@ class KeystoreDecryptionError(WalletError):
     pass
 
 
-class InsufficientFundsError(WalletError):
-    pass
-
-
 class TransactionError(RootstockError):
     pass
 
@@ -54,6 +50,10 @@ class GasEstimationError(TransactionError):
 
 
 class NonceTooLowError(TransactionError):
+    pass
+
+
+class InsufficientFundsError(TransactionError):
     pass
 
 
@@ -99,5 +99,3 @@ class AddressError(RootstockError):
 
 class InvalidAddressError(AddressError):
     pass
-
-

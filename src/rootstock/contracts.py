@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 
 
 class Contract:
-
     def __init__(
         self, provider: RootstockProvider, address: str, abi: list[dict], *, verify: bool = True
     ):
@@ -35,14 +34,13 @@ class Contract:
                 raise ContractNotFoundError(f"No contract code at address {address}")
 
         self._abi = abi
-        self._contract: Web3Contract = provider.w3.eth.contract(
-            address=self._address, abi=abi
-        )
+        self._contract: Web3Contract = provider.w3.eth.contract(address=self._address, abi=abi)
 
     @classmethod
     def from_abi_file(
         cls, provider: RootstockProvider, address: str, abi_path: str | Path
     ) -> Contract:
+        """Load contract from a JSON ABI file on disk."""
         path = Path(abi_path)
         if not path.exists():
             raise ABIError(f"ABI file not found: {path}")
@@ -53,6 +51,7 @@ class Contract:
         return cls(provider, address, abi)
 
     def call(self, function_name: str, *args, block: str | int = "latest", **kwargs) -> object:
+        """Call a read-only contract function."""
         fn = self._get_function(function_name)
         try:
             return fn(*args, **kwargs).call(block_identifier=block)
@@ -72,16 +71,18 @@ class Contract:
         nonce: int | None = None,
         wait: bool = True,
         timeout: int = 120,
+        tx_builder: TransactionBuilder | None = None,
         **kwargs,
     ) -> dict | str:
+        """Send a state-changing transaction to a contract function."""
         fn = self._get_function(function_name)
-        tx_builder = TransactionBuilder(self._provider, wallet)
+        builder = tx_builder or TransactionBuilder(self._provider, wallet)
 
         data = fn(*args, **kwargs).build_transaction(
             {"from": normalize_address_for_web3(wallet.address), "gas": 0}
         )["data"]
 
-        tx_dict = tx_builder.build_transaction(
+        tx_dict = builder.build_transaction(
             to=self._address,
             value=value,
             data=data,
@@ -89,13 +90,12 @@ class Contract:
             gas_price=gas_price,
             nonce=nonce,
         )
-        return tx_builder.sign_and_send(tx_dict, wait=wait, timeout=timeout)
+        return builder.sign_and_send(tx_dict, wait=wait, timeout=timeout)
 
     def encode_function_data(self, function_name: str, *args, **kwargs) -> str:
+        """Return ABI-encoded call data for a function."""
         fn = self._get_function(function_name)
-        data = fn(*args, **kwargs).build_transaction(
-            {"from": "0x" + "0" * 40, "gas": 0}
-        )["data"]
+        data = fn(*args, **kwargs).build_transaction({"from": "0x" + "0" * 40, "gas": 0})["data"]
         return data
 
     def get_events(
@@ -105,39 +105,28 @@ class Contract:
         to_block: int | str = "latest",
         filters: dict | None = None,
     ) -> list[dict]:
+        """Fetch historical events via eth_getLogs."""
         try:
             event = self._contract.events[event_name]
         except (KeyError, AttributeError) as exc:
             raise ABIError(f"Event {event_name!r} not found in ABI") from exc
 
         try:
-            filter_params = {
-                "fromBlock": from_block,
-                "toBlock": to_block,
-            }
+            kwargs: dict = {"fromBlock": from_block, "toBlock": to_block}
             if filters:
-                filter_params["argument_filters"] = filters
-
-            entries = event.create_filter(**filter_params).get_all_entries()
+                kwargs["argument_filters"] = filters
+            entries = event.get_logs(**kwargs)
             return [dict(e) for e in entries]
         except Exception as exc:
             raise RPCError(f"Failed to fetch events: {exc}") from exc
 
     @property
     def functions(self) -> list[str]:
-        return [
-            item["name"]
-            for item in self._abi
-            if item.get("type") == "function"
-        ]
+        return [item["name"] for item in self._abi if item.get("type") == "function"]
 
     @property
     def events(self) -> list[str]:
-        return [
-            item["name"]
-            for item in self._abi
-            if item.get("type") == "event"
-        ]
+        return [item["name"] for item in self._abi if item.get("type") == "event"]
 
     @property
     def address(self) -> str:

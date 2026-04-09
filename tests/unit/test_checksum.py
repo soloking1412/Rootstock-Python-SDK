@@ -82,6 +82,55 @@ class TestToChecksumAddress:
         with pytest.raises(InvalidAddressError):
             to_checksum_address("0xinvalid")
 
+    # EIP-1191 / RSKIP-60 reference vectors
+    def test_eip1191_chain30_vector1(self):
+        addr = "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"
+        assert (
+            to_checksum_address(addr, chain_id=30) == "0x5aaEB6053f3e94c9b9a09f33669435E7ef1bEAeD"
+        )
+
+    def test_eip1191_chain31_vector1(self):
+        addr = "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"
+        assert (
+            to_checksum_address(addr, chain_id=31) == "0x5aAeb6053F3e94c9b9A09F33669435E7EF1BEaEd"
+        )
+
+    def test_eip1191_chain30_vector2(self):
+        addr = "0xfb6916095ca1df60bb79ce92ce3ea74c37c5d359"
+        assert (
+            to_checksum_address(addr, chain_id=30) == "0xFb6916095cA1Df60bb79ce92cE3EA74c37c5d359"
+        )
+
+    def test_eip1191_chain31_vector2(self):
+        addr = "0xfb6916095ca1df60bb79ce92ce3ea74c37c5d359"
+        assert (
+            to_checksum_address(addr, chain_id=31) == "0xFb6916095CA1dF60bb79CE92ce3Ea74C37c5D359"
+        )
+
+    def test_eip1191_chain30_vector3(self):
+        addr = "0xdbf03b407c01e7cd3cbea99509d93f8dddc8c6fb"
+        assert (
+            to_checksum_address(addr, chain_id=30) == "0xDBF03B407c01E7CD3cBea99509D93F8Dddc8C6FB"
+        )
+
+    def test_eip1191_chain31_vector3(self):
+        addr = "0xdbf03b407c01e7cd3cbea99509d93f8dddc8c6fb"
+        assert (
+            to_checksum_address(addr, chain_id=31) == "0xdbF03B407C01E7cd3cbEa99509D93f8dDDc8C6fB"
+        )
+
+    def test_eip1191_chain30_vector4(self):
+        addr = "0xd9b4beebb9dd27ff78c5c65b2feed2f4ca4db3d4"
+        assert (
+            to_checksum_address(addr, chain_id=30) == "0xd9b4BEeBb9dd27ff78c5c65b2fEED2f4cA4db3d4"
+        )
+
+    def test_eip1191_chain31_vector4(self):
+        addr = "0xd9b4beebb9dd27ff78c5c65b2feed2f4ca4db3d4"
+        assert (
+            to_checksum_address(addr, chain_id=31) == "0xd9b4BEEBb9dd27fF78C5C65B2fEEd2f4Ca4Db3d4"
+        )
+
 
 class TestIsChecksumAddress:
     def test_valid_eip55(self):
@@ -100,8 +149,6 @@ class TestIsChecksumAddress:
     def test_wrong_chain_id(self):
         addr = "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"
         checksummed = to_checksum_address(addr, chain_id=30)
-        # Validating with a different chain_id should generally fail
-        # (unless by coincidence the checksums match)
         result_31 = is_checksum_address(checksummed, chain_id=31)
         result_none = is_checksum_address(checksummed, chain_id=None)
         assert not (result_31 and result_none)

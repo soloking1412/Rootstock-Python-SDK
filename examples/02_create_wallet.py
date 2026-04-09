@@ -5,7 +5,7 @@ from rootstock import ChainId, Wallet
 # Create a new wallet
 wallet = Wallet.create(chain_id=ChainId.TESTNET)
 print(f"Address: {wallet.address}")
-print(f"Private Key: {wallet.private_key[:6]}...{wallet.private_key[-4:]}")
+print(f"Wallet info: {wallet.info}")
 print(f"Chain ID: {wallet.chain_id}")
 
 # Encrypt to keystore

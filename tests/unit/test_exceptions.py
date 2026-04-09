@@ -28,15 +28,28 @@ from rootstock.exceptions import (
 class TestExceptionHierarchy:
     def test_all_inherit_from_rootstock_error(self):
         exceptions = [
-            ProviderError, ProviderConnectionError, RPCError,
-            WalletError, InvalidPrivateKeyError, KeystoreDecryptionError,
-            InsufficientFundsError,
-            TransactionError, TransactionRevertedError, GasEstimationError,
+            ProviderError,
+            ProviderConnectionError,
+            RPCError,
+            WalletError,
+            InvalidPrivateKeyError,
+            KeystoreDecryptionError,
+            TransactionError,
+            TransactionRevertedError,
+            GasEstimationError,
             NonceTooLowError,
-            ContractError, ContractNotFoundError, ABIError,
-            TokenError, AllowanceExceededError,
-            RNSError, DomainNotFoundError, ResolverNotFoundError, InvalidDomainError,
-            AddressError, InvalidAddressError,
+            InsufficientFundsError,
+            ContractError,
+            ContractNotFoundError,
+            ABIError,
+            TokenError,
+            AllowanceExceededError,
+            RNSError,
+            DomainNotFoundError,
+            ResolverNotFoundError,
+            InvalidDomainError,
+            AddressError,
+            InvalidAddressError,
         ]
         for exc_cls in exceptions:
             assert issubclass(exc_cls, RootstockError), f"{exc_cls.__name__} not subclass"
@@ -48,12 +61,15 @@ class TestExceptionHierarchy:
     def test_wallet_hierarchy(self):
         assert issubclass(InvalidPrivateKeyError, WalletError)
         assert issubclass(KeystoreDecryptionError, WalletError)
-        assert issubclass(InsufficientFundsError, WalletError)
 
     def test_transaction_hierarchy(self):
         assert issubclass(TransactionRevertedError, TransactionError)
         assert issubclass(GasEstimationError, TransactionError)
         assert issubclass(NonceTooLowError, TransactionError)
+        assert issubclass(InsufficientFundsError, TransactionError)
+
+    def test_insufficient_funds_not_wallet_error(self):
+        assert not issubclass(InsufficientFundsError, WalletError)
 
     def test_contract_hierarchy(self):
         assert issubclass(ContractNotFoundError, ContractError)

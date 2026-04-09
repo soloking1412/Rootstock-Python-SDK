@@ -9,7 +9,6 @@ from rootstock.constants import EXPLORER_URLS, RPC_URLS, ChainId
 
 @dataclass(frozen=True)
 class NetworkConfig:
-
     chain_id: int
     rpc_url: str
     explorer_url: str

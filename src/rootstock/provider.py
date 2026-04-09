@@ -79,9 +79,7 @@ class RootstockProvider:
             self._w3.eth.get_balance, normalize_address_for_web3(address), block
         )
 
-    def get_transaction_count(
-        self, address: str, block: BlockIdentifier = "latest"
-    ) -> int:
+    def get_transaction_count(self, address: str, block: BlockIdentifier = "latest") -> int:
         return self._call_with_retry(
             self._w3.eth.get_transaction_count, normalize_address_for_web3(address), block
         )
@@ -148,9 +146,7 @@ class RootstockProvider:
                 tx_hash, timeout=timeout, poll_latency=poll_interval
             )
         except TimeExhausted as exc:
-            raise TransactionError(
-                f"Transaction {tx_hash} not mined within {timeout}s"
-            ) from exc
+            raise TransactionError(f"Transaction {tx_hash} not mined within {timeout}s") from exc
         except Exception as exc:
             raise self._wrap_error(exc) from exc
 
@@ -167,10 +163,13 @@ class RootstockProvider:
             except OSError as exc:
                 last_exc = exc
                 if attempt < self._max_retries - 1:
-                    delay = 2 ** attempt
+                    delay = 2**attempt
                     logger.warning(
                         "RPC call failed (attempt %d/%d), retrying in %ds: %s",
-                        attempt + 1, self._max_retries, delay, exc,
+                        attempt + 1,
+                        self._max_retries,
+                        delay,
+                        exc,
                     )
                     time.sleep(delay)
             except Exception as exc:
@@ -195,7 +194,7 @@ class RootstockProvider:
                 return NonceTooLowError(str(error))
             logger.error("RPC error: %s", error)
             return RPCError(str(error))
-        if isinstance(error, (TransactionError, GasEstimationError)):
+        if isinstance(error, TransactionError):
             return error
         logger.error("Unexpected error: %s", error)
         return RPCError(f"RPC error: {error}")
