@@ -168,6 +168,10 @@ class TestNormalizeData:
         with pytest.raises(ValueError, match="hex-prefixed"):
             _normalize_data("deadbeef")
 
+    def test_invalid_type_raises(self):
+        with pytest.raises(TypeError):
+            _normalize_data(123)  # type: ignore[arg-type]
+
     def test_invalid_data_in_build_transaction(self, builder):
         with pytest.raises(ValueError):
             builder.build_transaction(to=TEST_TO, data="deadbeef", gas_limit=21000)

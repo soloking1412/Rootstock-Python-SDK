@@ -108,7 +108,12 @@ class TransactionBuilder:
         timeout: int = 120,
         check_balance: bool = False,
     ) -> dict | str:
-        """Sign and broadcast a transaction dict."""
+        """Sign and broadcast a transaction dict.
+
+        Set check_balance=True to verify the wallet has enough funds before
+        sending. Raises InsufficientFundsError if the balance is too low.
+        Defaults to False for contract calls where value is typically zero.
+        """
         if check_balance:
             balance = self._provider.get_balance(self._wallet.address)
             total_needed = tx_dict.get("value", 0) + tx_dict["gas"] * tx_dict["gasPrice"]

@@ -40,18 +40,21 @@ class RootstockProvider:
     def from_mainnet(
         cls, rpc_url: str | None = None, request_timeout: int = 30, max_retries: int = 3
     ) -> RootstockProvider:
+        """Connect to RSK mainnet (chain_id=30)."""
         return cls(NetworkConfig.mainnet(rpc_url), request_timeout, max_retries)
 
     @classmethod
     def from_testnet(
         cls, rpc_url: str | None = None, request_timeout: int = 30, max_retries: int = 3
     ) -> RootstockProvider:
+        """Connect to RSK testnet (chain_id=31)."""
         return cls(NetworkConfig.testnet(rpc_url), request_timeout, max_retries)
 
     @classmethod
     def from_url(
         cls, rpc_url: str, chain_id: int, request_timeout: int = 30, max_retries: int = 3
     ) -> RootstockProvider:
+        """Connect to a custom RPC URL with the given chain_id."""
         network = NetworkConfig.custom(chain_id=chain_id, rpc_url=rpc_url)
         return cls(network, request_timeout, max_retries)
 
@@ -75,11 +78,13 @@ class RootstockProvider:
             return False
 
     def get_balance(self, address: str, block: BlockIdentifier = "latest") -> int:
+        """Return the RBTC balance of an address in wei."""
         return self._call_with_retry(
             self._w3.eth.get_balance, normalize_address_for_web3(address), block
         )
 
     def get_transaction_count(self, address: str, block: BlockIdentifier = "latest") -> int:
+        """Return the number of transactions sent from an address (the nonce)."""
         return self._call_with_retry(
             self._w3.eth.get_transaction_count, normalize_address_for_web3(address), block
         )
@@ -105,6 +110,7 @@ class RootstockProvider:
         return self._call_with_retry(lambda: self._w3.eth.gas_price)
 
     def estimate_gas(self, tx_params: dict) -> int:
+        """Estimate gas for a transaction. Raises GasEstimationError if the call reverts."""
         try:
             return self._call_with_retry(
                 self._w3.eth.estimate_gas, tx_params, reraise=(ContractLogicError,)
@@ -119,6 +125,7 @@ class RootstockProvider:
         return bytes(result)
 
     def call(self, tx_params: dict, block: BlockIdentifier = "latest") -> bytes:
+        """Execute a read-only call. Raises RPCError if the call reverts."""
         try:
             return bytes(
                 self._call_with_retry(
@@ -129,6 +136,7 @@ class RootstockProvider:
             raise RPCError(f"Call reverted: {exc}") from exc
 
     def send_raw_transaction(self, signed_tx: bytes | str) -> str:
+        """Broadcast a signed transaction and return the transaction hash."""
         try:
             tx_hash = self._w3.eth.send_raw_transaction(signed_tx)
             result = tx_hash.hex() if isinstance(tx_hash, bytes) else str(tx_hash)
@@ -141,6 +149,7 @@ class RootstockProvider:
     def wait_for_transaction(
         self, tx_hash: str, timeout: int = 120, poll_interval: float = 2.0
     ) -> dict:
+        """Poll until the transaction is mined and return its receipt."""
         try:
             receipt = self._w3.eth.wait_for_transaction_receipt(
                 tx_hash, timeout=timeout, poll_latency=poll_interval

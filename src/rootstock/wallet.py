@@ -77,10 +77,7 @@ class Wallet:
     @property
     def private_key(self) -> str:
         """Return the private key as a hex string. Keep this value secret."""
-        key = self._account.key
-        if isinstance(key, bytes):
-            return "0x" + key.hex()
-        return str(key)
+        return "0x" + self._account.key.hex()
 
     @property
     def chain_id(self) -> int:

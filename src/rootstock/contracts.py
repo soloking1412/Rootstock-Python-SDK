@@ -10,6 +10,7 @@ from web3.contract import Contract as Web3Contract
 from web3.exceptions import ContractLogicError
 
 from rootstock._utils.checksum import normalize_address_for_web3
+from rootstock.constants import ZERO_ADDRESS
 from rootstock.exceptions import ABIError, ContractError, ContractNotFoundError, RPCError
 from rootstock.provider import RootstockProvider
 from rootstock.transactions import TransactionBuilder
@@ -95,7 +96,7 @@ class Contract:
     def encode_function_data(self, function_name: str, *args, **kwargs) -> str:
         """Return ABI-encoded call data for a function."""
         fn = self._get_function(function_name)
-        data = fn(*args, **kwargs).build_transaction({"from": "0x" + "0" * 40, "gas": 0})["data"]
+        data = fn(*args, **kwargs).build_transaction({"from": ZERO_ADDRESS, "gas": 0})["data"]
         return data
 
     def get_events(
